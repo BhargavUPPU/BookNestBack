@@ -330,7 +330,6 @@ export class BookIssuedService {
         user: true,
       },
     });
-  
 
     // Update book item status
     await this.prisma.bookItem.update({
@@ -398,7 +397,7 @@ export class BookIssuedService {
         });
       }
     }
-    
+
     // Optionally, you can remove the waiting list entries after notifying
     // await this.prisma.waitingList.deleteMany({
     //   where: {
@@ -406,7 +405,6 @@ export class BookIssuedService {
     //     status: "notified",
     //   },
     // });
-
   }
 
   async getOverdueBooks() {
