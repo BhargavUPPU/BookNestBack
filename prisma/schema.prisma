@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model College {
+  college_id       String    @id
+  college_name     String
+  college_location String
+  total_students   Int
+  libraries        Library[]
+  users            User[]
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+}
+
+model Library {
+  library_id    String        @id
+  library_name  String
+  college       College       @relation(fields: [college_id], references: [college_id], onDelete: Cascade)
+  college_id    String
+  location      String
+  opening_hours Json
+  contact_phone String
+  books         Book[]
+  waitingList   WaitingList[]
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+  Collection    Collection[]
+}
+
+model User {
+  user_id           String         @id
+  first_name        String
+  last_name         String
+  college           College        @relation(fields: [college_id], references: [college_id], onDelete: Cascade)
+  college_id        String
+  email             String         @unique
+  role              Role
+  branch            String
+  max_books_allowed Int            @default(5)
+  is_active         Boolean
+  issued_book_count Int            @default(0)
+  favorites_count   Int            @default(0)
+  waitingList_count Int            @default(0)
+  booksIssued       BookIssued[]
+  fines             Fine[]
+  notifications     Notification[]
+  waitingList       WaitingList[]
+  transactions      Transaction[]
+  favorites         Favorite[]
+  fcm_token         fcm_token[]
+  
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+}
+
+model Collection {
+  collection_id String           @id
+  name          String
+  library       Library          @relation(fields: [library_id], references: [library_id])
+  library_id    String
+  description   String?
+  books         CollectionBook[]
+  primary_books Book[]           @relation("PrimaryCollectionBooks") // Added reciprocal relation
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @updatedAt
+}
+
+model Book {
+  book_id          String    @id
+  title            String
+  authors          String[]  @default([])
+  isbn             String    @unique
+  isbn10           String?
+  publisher        String
+  publication_date DateTime?
+  category         String
+  library          Library   @relation(fields: [library_id], references: [library_id])
+  library_id       String
+  description      String
+  page_count       Int?
+  price            String?   @db.VarChar(12)
+  cover_image_url  String?
+  call_number      String?
+  ddc              String?
+  lcc              String?
+
+  // Updated relation with explicit name
+  primary_collection    Collection?      @relation("PrimaryCollectionBooks", fields: [primary_collection_id], references: [collection_id])
+  primary_collection_id String?
+  items                 BookItem[]
+  waitingList           WaitingList[]
+  collections           CollectionBook[]
+  favorites             Favorite[]
+  created_at            DateTime         @default(now())
+  updated_at            DateTime         @updatedAt
+}
+
+model Favorite {
+  favorite_id String   @id
+  user        User     @relation(fields: [user_id], references: [user_id])
+  user_id     String
+  book        Book     @relation(fields: [book_id], references: [book_id])
+  book_id     String
+  is_favorite Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  @@unique([user_id, book_id])
+}
+
+model CollectionBook {
+  collection_book_id String     @id
+  collection         Collection @relation(fields: [collection_id], references: [collection_id])
+  collection_id      String
+  book               Book       @relation(fields: [book_id], references: [book_id])
+  book_id            String
+  created_at         DateTime   @default(now())
+
+  @@unique([collection_id, book_id])
+}
+
+model Group {
+  group_id   String   @id
+  name       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Tag {
+  tag_id     String   @id
+  name       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model BookItem {
+  item_id    String        @id
+  book       Book          @relation(fields: [book_id], references: [book_id])
+  book_id    String
+  barcode    String        @unique
+  status     BookStatus    @default(available)
+  condition  BookCondition @default(new)
+  issued     BookIssued[]
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+}
+
+model BookIssued {
+  issued_id     String      @id
+  item          BookItem    @relation(fields: [item_id], references: [item_id])
+  item_id       String
+  user          User        @relation(fields: [user_id], references: [user_id])
+  user_id       String
+  issued_date   DateTime
+  due_date      DateTime
+  return_date   DateTime?
+  status        IssueStatus
+  renewed_count Int         @default(0)
+  fine          Fine?
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+}
+
+model WaitingList {
+  waiting_id   String        @id
+  user         User          @relation(fields: [user_id], references: [user_id])
+  user_id      String
+  book         Book          @relation(fields: [book_id], references: [book_id])
+  book_id      String
+  library      Library       @relation(fields: [library_id], references: [library_id])
+  library_id   String        @unique
+  request_date DateTime
+  priority     Int
+  status       WaitingStatus
+  expires_at   DateTime
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+}
+
+model Fine {
+  fine_id    String     @id
+  user       User       @relation(fields: [user_id], references: [user_id])
+  user_id    String
+  issued     BookIssued @relation(fields: [issued_id], references: [issued_id])
+  issued_id  String     @unique
+  amount     Decimal
+  reason     FineReason
+  status     FineStatus
+  paid_date  DateTime?
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+}
+
+model Transaction {
+  transaction_id String            @id
+  user           User              @relation(fields: [user_id], references: [user_id])
+  user_id        String
+  type           TransactionType
+  amount         Decimal
+  payment_method PaymentMethod
+  status         TransactionStatus
+  reference_id   String?
+  created_at     DateTime          @default(now())
+}
+
+model Notification {
+  notification_id String           @id
+  user            User             @relation(fields: [user_id], references: [user_id])
+  user_id         String
+  type            NotificationType
+  message         String
+  is_read         Boolean
+  metadata        Json
+  created_at      DateTime         @default(now())
+}
+
+model fcm_token {
+  token_id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user       User?    @relation(fields: [user_id], references: [user_id])
+  user_id    String   @unique
+  created_at DateTime @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+enum Role {
+  student
+  librarian
+  admin
+}
+
+enum BookStatus {
+  available
+  checked_out
+  reserved
+  lost
+  damaged
+}
+
+enum BookCondition {
+  new
+  good
+  worn
+  poor
+}
+
+enum IssueStatus {
+  active
+  returned
+  overdue
+  lost
+}
+
+enum WaitingStatus {
+  pending
+  notified
+  cancelled
+  fulfilled
+}
+
+enum FineReason {
+  overdue
+  lost
+  damage
+}
+
+enum FineStatus {
+  unpaid
+  paid
+  waived
+}
+
+enum TransactionType {
+  fine_payment
+  book_rental
+  membership
+}
+
+enum TransactionStatus {
+  success
+  failed
+  pending
+}
+
+enum PaymentMethod {
+  cash
+  card
+  online
+}
+
+enum NotificationType {
+  book_available
+  due_reminder
+  fine_alert
+  general
+}
