@@ -227,6 +227,7 @@ model Notification {
 model fcm_token {
   token_id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user       User?    @relation(fields: [user_id], references: [user_id])
+  token      String   @unique
   user_id    String   @unique
   created_at DateTime @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
