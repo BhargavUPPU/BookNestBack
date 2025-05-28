@@ -38,6 +38,12 @@ export class BookIssuedController {
   findAll() {
     return this.bookIssuedService.findAll();
   }
+  
+  @Get("library/:libraryId")
+  findByLibrary(@Param("libraryId") libraryId: string) {
+    return this.bookIssuedService.findByLibrary(libraryId);
+  }
+
 
   @Get('user/:userId')
   findByUser(@Param('userId') userId: string) {

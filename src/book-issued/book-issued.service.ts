@@ -138,6 +138,7 @@ export class BookIssuedService {
     //     },
     //   },
     // });
+
     await this.prisma.user.update({
       where: { user_id: createBookIssuedDto.user_id },
       data: {
@@ -267,6 +268,39 @@ export class BookIssuedService {
           },
         },
         // user: true,
+      },
+    });
+  }
+
+  async findByLibrary(library_id: string) {
+    const library = await this.prisma.library.findUnique({
+      where: { library_id },
+    });
+    if (!library) {
+      throw new NotFoundException(`Library with ID ${library_id} not found`);
+    }
+    return this.prisma.bookIssued.findMany({
+      where: {
+        status: {
+          not: "returned",
+        },
+        item: {
+          is: {
+            book: {
+              is: {
+                library_id: library_id,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        item: {
+          include: {
+            book: true,
+          },
+        },
+        user: true,
       },
     });
   }
