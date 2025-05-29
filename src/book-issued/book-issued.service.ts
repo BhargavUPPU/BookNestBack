@@ -391,12 +391,73 @@ export class BookIssuedService {
       });
     }
     // Notify users in the waiting list
-    await this.notifyWaitingList(bookItem, updatedBookIssued);
+    await this.notifyWaitingList(bookItem);
+    return updatedBookIssued;
+  }
+
+  async returnBookByIssuedId(issued_id: string,) {
+  
+    const bookIssued = await this.prisma.bookIssued.findUnique({
+      where: { issued_id:issued_id },
+      include: { item: true },
+    });
+
+    if (!bookIssued) {
+      throw new NotFoundException(`Book issued record with ID  not found`);
+    }
+
+    if (bookIssued.return_date) {
+      throw new BadRequestException('Book has already been returned');
+    }
+
+    // Update book issued record
+    const updatedBookIssued = await this.prisma.bookIssued.update({
+      where: { issued_id: bookIssued.issued_id },
+      data: {
+        return_date: new Date(),
+        status: IssueStatus.returned
+      },
+      include: {
+        item: {
+          include: {
+            book: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    // Update book item status
+    await this.prisma.bookItem.update({
+      where: { item_id: bookIssued.item_id },
+      data: { status: BookStatus.available },
+    });   await this.prisma.user.update({
+      where: { user_id: bookIssued.user_id },
+      data: {
+        issued_book_count: {
+          decrement: 1,
+        },
+      },
+    });
+    //send notification to user
+    const token = await this.prisma.fcm_token.findFirst({
+      where: { user_id: bookIssued.user_id },
+    });
+    if (token) {
+      await this.firebaseNotificationService.sendPush({
+        title: "Book Returned",
+        body: `You have returned the book with title "${updatedBookIssued.item.book.title}"`,
+        deviceId: token.token,
+      });
+    }
+    // Notify users in the waiting list
+    await this.notifyWaitingList(updatedBookIssued.item);
+
     return updatedBookIssued;
   }
 
   // Notify users in the waiting list
-  private async notifyWaitingList(bookItem, updatedBookIssued) {
+  private async notifyWaitingList(bookItem) {
     const waitingListEntries = await this.prisma.waitingList.findMany({
       where: {
         book_id: bookItem.book.book_id,
